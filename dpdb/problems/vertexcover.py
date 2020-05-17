@@ -15,7 +15,7 @@ class VertexCover(Problem):
     def td_node_column_def(self,var):
         return (var2col(var), "BOOLEAN")
 
-    def td_node_extra_columns(self):
+    def td_node_extra_columns(self, node):
         return [("size","INTEGER")]
         
     def candidate_extra_cols(self,node):

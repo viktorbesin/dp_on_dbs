@@ -17,7 +17,7 @@ class SharpSat(Problem):
     def td_node_column_def(self,var):
         return td_node_column_def(var)
 
-    def td_node_extra_columns(self):
+    def td_node_extra_columns(self, node):
         return [("model_count","NUMERIC")]
         
     def candidate_extra_cols(self,node):

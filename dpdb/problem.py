@@ -54,6 +54,10 @@ def var2tab_alias(node, var):
 def var2col(var):
     return f"v{var}"
 
+# var needs introduce:
+#   alias: iV.val vV
+#   else: iV.val
+# else: tN.vV
 def var2tab_col(node, var, alias=True):
     if node.needs_introduce(var):
         if alias:
@@ -85,7 +89,7 @@ class Problem(object):
     def td_node_column_def(self, var):
         pass
 
-    def td_node_extra_columns(self):
+    def td_node_extra_columns(self, node):
         return []
 
     def candidate_extra_cols(self,node):
@@ -282,9 +286,11 @@ class Problem(object):
 
             # create all columns and insert null if values are not used in parent
             # this only works in the current version of manual inserts without procedure calls in worker
-            db.create_table(f"td_node_{n.id}", [self.td_node_column_def(c) for c in n.vertices] + self.td_node_extra_columns())
+
+            # workaround to allow more colums per variable
+            db.create_table(f"td_node_{n.id}", [self.td_node_column_def(c) for c in n.vertices] + self.td_node_extra_columns(n))
             if self.candidate_store == "table":
-                db.create_table(f"td_node_{n.id}_candidate", [self.td_node_column_def(c) for c in n.vertices] + self.td_node_extra_columns())
+                db.create_table(f"td_node_{n.id}_candidate", [self.td_node_column_def(c) for c in n.vertices] + self.td_node_extra_columns(n))
                 candidate_view = self.candidates_select(n)
                 candidate_view = db.replace_dynamic_tabs(candidate_view)
                 db.create_view(f"td_node_{n.id}_candidate_v", candidate_view)
