@@ -16,10 +16,10 @@ class IndependentDominatingSet(Problem):
         return (var2col(var), "BOOLEAN")
 
     def td_node_extra_columns(self, node):
-        return [(f"d{v}", "BOOLEAN") for v in node.vertices] +  [("size","INTEGER")]
+        return [(var2col_dominance(v), "BOOLEAN") for v in node.vertices] +  [("size","INTEGER")]
         
     def candidate_extra_cols(self,node):
-        dominations = [var2dominance(node,v,self.edges[v]) + " AS d{}".format(v)
+        dominations = [var2dominance(node,v,self.edges[v]) + " AS " + var2col_dominance(v)
                           for v in node.vertices]
 
         size = [node2size(n) for n in node.children]
@@ -39,10 +39,11 @@ class IndependentDominatingSet(Problem):
         return dominations + [size_q]
 
     def assignment_extra_cols(self,node):
-        return [f"d{v}" if v in node.stored_vertices else f"null::BOOLEAN d{v}" for v in node.vertices] + ["min(size) AS size"]
+        return [var2col_dominance(v) if v in node.stored_vertices
+                else f"null::BOOLEAN " + var2col_dominance(v) for v in node.vertices] + ["min(size) AS size"]
 
     def filter(self, node):
-        dominations = ["d{}".format(v) for v in node.vertices if v not in node.stored_vertices or node.is_root()]
+        dominations = [var2col_dominance(v)for v in node.vertices if v not in node.stored_vertices or node.is_root()]
 
         independence = []
         edges = []
@@ -101,7 +102,7 @@ class IndependentDominatingSet(Problem):
         logger.info("Min independent dominating set size: %d", size)
 
     def group_extra_cols(self,node):
-        return [f"d{v}" for v in node.stored_vertices]
+        return [var2col_dominance(v) for v in node.stored_vertices]
 
 
 def var2size(node,var):
@@ -111,6 +112,8 @@ def var2size(node,var):
 def node2size(node):
     return "{}.size".format(node2tab_alias(node))
 
+def var2col_dominance(var):
+    return f"d{var}"
 
 # For Dominance:
 # When Introduction needed: set to 1 when neighbor or self is set
@@ -120,7 +123,7 @@ def var2dominance(node, var, edges):
     if node.needs_introduce(var):
         child_dom = var2tab_col(node,var,False)
     else:
-        child_dom = "{}.d{}".format(var2tab_alias(node,var), var)
+        child_dom = "{}.{}".format(var2tab_alias(node,var), var2col_dominance(var))
 
     neigh = []
 
