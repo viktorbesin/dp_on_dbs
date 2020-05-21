@@ -19,7 +19,7 @@ class IndependentDominatingSet(Problem):
         return [(f"d{v}", "BOOLEAN") for v in node.vertices] +  [("size","INTEGER")]
         
     def candidate_extra_cols(self,node):
-        dominations = [self.var2dominance(node,v) + " AS d{}".format(v)
+        dominations = [var2dominance(node,v,self.edges[v]) + " AS d{}".format(v)
                           for v in node.vertices]
 
         size = [node2size(n) for n in node.children]
@@ -42,7 +42,7 @@ class IndependentDominatingSet(Problem):
         return [f"d{v}" if v in node.stored_vertices else f"null::BOOLEAN d{v}" for v in node.vertices] + ["min(size) AS size"]
 
     def filter(self, node):
-        dominations = ["( "+ " AND ".join("d{}".format(v) for v in node.vertices) + ")"]
+        dominations = ["d{}".format(v) for v in node.vertices if v not in node.stored_vertices or node.is_root()]
 
         independence = []
         edges = []
@@ -63,6 +63,7 @@ class IndependentDominatingSet(Problem):
                 return "WHERE ({})".format(") AND (".join(independence))
             else:
                 return ""
+
 
 
     def setup_extra(self):
@@ -102,25 +103,6 @@ class IndependentDominatingSet(Problem):
     def group_extra_cols(self,node):
         return [f"d{v}" for v in node.stored_vertices]
 
-    # For Dominance:
-    # When Introduction needed: set to 1 when neighbor or self is set
-    # else: use dominance of child, i.e. 1
-    def var2dominance(self, node, var):
-        if node.needs_introduce(var):
-
-            neigh = []
-
-            for v in self.edges[var]:
-                if v in node.vertices:
-                    neigh.append(var2tab_col(node,v,False))
-
-            if neigh:
-                return "case when {} then true else false end".format(" OR ".join(neigh + [var2tab_col(node,var,False)]))
-            else:
-                return "case when {} then true else false end".format(var2tab_col(node,var,False))
-        else:
-            return "{}.d{}".format(var2tab_alias(node,var), var)
-
 
 def var2size(node,var):
     return "case when {} then 1 else 0 end".format(var2tab_col(node,var,False))
@@ -128,6 +110,28 @@ def var2size(node,var):
 
 def node2size(node):
     return "{}.size".format(node2tab_alias(node))
+
+
+# For Dominance:
+# When Introduction needed: set to 1 when neighbor or self is set
+# else: additional use dominance of child
+def var2dominance(node, var, edges):
+    # use iX.val if new variable, else child table dX
+    if node.needs_introduce(var):
+        child_dom = var2tab_col(node,var,False)
+    else:
+        child_dom = "{}.d{}".format(var2tab_alias(node,var), var)
+
+    neigh = []
+
+    for v in edges:
+        if v in node.vertices:
+            neigh.append(var2tab_col(node,v,False))
+
+    if neigh:
+        return "case when {} then true else false end".format(" OR ".join(neigh + [child_dom]))
+    else:
+        return "case when {} then true else false end".format(child_dom)
 
 args.specific[IndependentDominatingSet] = dict(
     help="Solve independent dominating set instances (min IDS)",
