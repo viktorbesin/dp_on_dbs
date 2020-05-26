@@ -3,7 +3,7 @@ import logging
 from collections import defaultdict
 
 from dpdb.problem import *
-from dpdb.reader import CnfReader
+from dpdb.reader import AdvancedCnfReader
 from .sat_util import *
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class MaxSat(Problem):
         # add cardinalities for vars which will be removed in the parent node
         for v in node.vertices:
             if v not in node.stored_vertices or node.is_root():
-                card.append(var2card(node, v, self.var_clause_dict))
+                card.append(var2card(node, v, self.var_soft_clause_dict))
 
         card_q = " + ".join(card)
 
@@ -39,8 +39,7 @@ class MaxSat(Problem):
         return ["max(card) AS card"]
 
     def filter(self,node):
-        # only for the case where all clauses are soft-clauses
-        return ""
+        return filter(self.var_hard_clause_dict, node)
 
     def setup_extra(self):
         def create_tables():
@@ -67,18 +66,24 @@ class MaxSat(Problem):
         insert_data()
 
     def prepare_input(self, fname):
-        input = CnfReader.from_file(fname)
+        input = AdvancedCnfReader.from_file(fname)
         self.num_vars = input.num_vars
         self.num_clauses = input.num_clauses
-        self.clauses = input.clauses
-        self.var_clause_dict = defaultdict(set)
+        self.hard_clauses = input.hard_clauses
+        self.soft_clauses = input.soft_clauses
 
-        return cnf2primal(input.num_vars, input.clauses, self.var_clause_dict)
+        self.var_hard_clause_dict = defaultdict(set)
+        self.var_soft_clause_dict = defaultdict(set)
+
+        a,edges_hard = cnf2primal(input.num_vars, input.hard_clauses, self.var_hard_clause_dict)
+        b,edges_soft = cnf2primal(input.num_vars, input.soft_clauses, self.var_soft_clause_dict)
+
+        return (input.num_vars, edges_hard | edges_soft)
 
     def after_solve(self):
         root_tab = f"td_node_{self.td.root.id}"
         card_sql = self.db.replace_dynamic_tabs(f"(select coalesce(max(card),0) from {root_tab})")
-        is_sat = self.db.replace_dynamic_tabs(f"(select exists(select 1 from {root_tab} WHERE card = {self.num_clauses}))")
+        is_sat = self.db.replace_dynamic_tabs(f"(select exists(select 1 from {root_tab} WHERE card + {card_sql} = {len(self.hard_clauses) + len(self.soft_clauses)}))")
         self.db.ignore_next_praefix()
         sat = self.db.update("problem_maxsat",["is_sat"],[is_sat],[f"ID = {self.id}"],"is_sat")[0]
         self.db.ignore_next_praefix()
@@ -95,7 +100,7 @@ def var2card(node,var,clauses):
     for d in candidates:
         for key, val in d.items():
             if key.issubset(vertice_set) and \
-                    (all(var <= v for v in key) or all(v not in key for v in removed_vertices)): #  or any(removed_vertices) not in key
+                    (all(var <= v for v in key) or all(v not in key for v in removed_vertices)):
                 cur_cl.add(val)
 
     if len(cur_cl) > 0:
@@ -117,6 +122,10 @@ args.specific[MaxSat] = dict(
             dest="store_formula",
             help="Store formula in database",
             action="store_true",
+        ),
+        "--soft-clauses": dict(
+            dest="soft_clauses",
+            help="Input file with explicit soft-clauses for the problem"
         )
     }
 )

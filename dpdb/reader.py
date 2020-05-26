@@ -103,6 +103,64 @@ class CnfReader(DimacsReader):
         if len(self.clauses) != self.num_clauses:
             logger.warning("Effective number of clauses mismatch preamble (%d vs %d)", len(self.clauses), self.num_clauses)
 
+class AdvancedCnfReader(DimacsReader):
+    def __init__(self):
+        super().__init__()
+        self.vars = []
+        self.hard_clauses = []
+        self.soft_clauses = []
+        self.solution = -1
+
+    def store_problem_vars(self):
+        # We assume a CNF file containing a solution is pre-solved by pmc and
+        # the solution line contains only the number of models for sharpsat
+        if self.problem_solution_type == 's':
+            logger.info("Problem has %d models (solved by pre-processing)", int(self.format))
+        else:
+            self.num_vars = int(self._problem_vars[0])
+            self.num_clauses = int(self._problem_vars[1])
+
+    def body(self, lines):
+        if self.format != "cnf":
+            logger.error("Not a cnf file!")
+            sys.exit(1)
+
+        maxvar = 0
+        for lineno, line in enumerate(lines):
+            if not line:
+                continue
+            i = 1
+            start = 0
+            if line.startswith("c ") or line == "c":
+                if not line.startswith("c soft "):
+                    continue
+                start = 2
+            while line[-1] != '0':
+                if lineno + i >= len(lines):
+                    logger.warning("Clause at line %d not terminated with 0", lineno)
+                    # Ignore clause instead of "fixing" it?
+                    line += " 0"
+                    break
+                line += lines[lineno + i]
+                lines[lineno + i] = None
+                i += 1
+            clause = [int(v) for v in line.split()[start:-1]]
+
+            if start == 0:
+                self.hard_clauses.append(clause)
+            elif start == 2:
+                self.soft_clauses.append(clause)
+
+            atoms = [abs(lit) for lit in clause]
+            self.vars.append(atoms)
+            maxvar = max(maxvar,max(atoms))
+
+        if maxvar != self.num_vars:
+            logger.warning("Effective number of variables mismatch preamble (%d vs %d)", maxvar, self.num_vars)
+        if len(self.hard_clauses) != self.num_clauses:
+            logger.warning("Effective number of clauses mismatch preamble (%d vs %d)", len(self.clauses), self.num_clauses)
+
+
 def _add_directed_edge(edges, adjacency_list, vertex1, vertex2):
     if vertex1 in adjacency_list:
         adjacency_list[vertex1].append(vertex2)
