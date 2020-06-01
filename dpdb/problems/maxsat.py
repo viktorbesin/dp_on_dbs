@@ -83,7 +83,7 @@ class MaxSat(Problem):
     def after_solve(self):
         root_tab = f"td_node_{self.td.root.id}"
         card_sql = self.db.replace_dynamic_tabs(f"(select coalesce(max(card),0) from {root_tab})")
-        is_sat = self.db.replace_dynamic_tabs(f"(select exists(select 1 from {root_tab} WHERE card + {card_sql} = {len(self.hard_clauses) + len(self.soft_clauses)}))")
+        is_sat = self.db.replace_dynamic_tabs(f"(select exists(select 1 from {root_tab} WHERE card = {len(self.soft_clauses)}))")
         self.db.ignore_next_praefix()
         sat = self.db.update("problem_maxsat",["is_sat"],[is_sat],[f"ID = {self.id}"],"is_sat")[0]
         self.db.ignore_next_praefix()
