@@ -89,7 +89,7 @@ class MaxSat(Problem):
         self.db.ignore_next_praefix()
         max_clauses = self.db.update("problem_maxsat",["max_sat_clauses"],[card_sql],[f"ID = {self.id}"],"max_sat_clauses")[0]
         logger.info("Problem is %s", "SAT" if sat else "UNSAT")
-        logger.info("Max satisfied clauses: %d", max_clauses)
+        logger.info("Max satisfied soft clauses: %d", max_clauses)
 
 def var2card(node,var,clauses):
     vertice_set = set(node.vertices)
@@ -122,10 +122,6 @@ args.specific[MaxSat] = dict(
             dest="store_formula",
             help="Store formula in database",
             action="store_true",
-        ),
-        "--soft-clauses": dict(
-            dest="soft_clauses",
-            help="Input file with explicit soft-clauses for the problem"
         )
     }
 )
