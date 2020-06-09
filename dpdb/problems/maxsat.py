@@ -8,7 +8,7 @@ from .sat_util import *
 
 logger = logging.getLogger(__name__)
 
-class MaxSat(Problem):
+class MaxSat(Problem, Countable):
 
     def __init__(self, name, pool, store_formula=False, **kwargs):
         super().__init__(name, pool, **kwargs)
@@ -87,9 +87,26 @@ class MaxSat(Problem):
         self.db.ignore_next_praefix()
         sat = self.db.update("problem_maxsat",["is_sat"],[is_sat],[f"ID = {self.id}"],"is_sat")[0]
         self.db.ignore_next_praefix()
-        max_clauses = self.db.update("problem_maxsat",["max_sat_clauses"],[card_sql],[f"ID = {self.id}"],"max_sat_clauses")[0]
+        self.max_clauses = self.db.update("problem_maxsat",["max_sat_clauses"],[card_sql],[f"ID = {self.id}"],"max_sat_clauses")[0]
         logger.info("Problem is %s", "SAT" if sat else "UNSAT")
-        logger.info("Max satisfied soft clauses: %d", max_clauses)
+        logger.info("Max satisfied soft clauses: %d", self.max_clauses)
+
+    # Overwriting Countable
+    def count_after_solve_select(self):
+        return (["count"], [f"card = {self.max_clauses}"])
+
+    def count_after_solve_log(self, count):
+        logger.info("Problem has %d interpretations with %d satisified soft clauses", count, self.max_clauses)
+
+    def extra_clauses_cols(self):
+        return "card"
+
+    def extra_clauses_cols_comparison(self):
+        return "max(card)"
+
+    def extra_clauses_filter_problem(self,node):
+        return self.filter(node)
+
 
 def var2card(node,var,clauses):
     vertice_set = set(node.vertices)

@@ -2,14 +2,14 @@
 import logging
 from collections import defaultdict
 
-from dpdb.problem import *
+from dpdb.countable import *
+
 from dpdb.reader import CnfReader
 from .sat_util import *
 
 logger = logging.getLogger(__name__)
 
-class Sat(Problem):
-
+class Sat(Problem, Countable):
     def __init__(self, name, pool, store_formula=False, **kwargs):
         super().__init__(name, pool, **kwargs)
         self.store_formula = store_formula
@@ -58,6 +58,11 @@ class Sat(Problem):
         self.db.ignore_next_praefix()
         sat = self.db.update("problem_sat",["is_sat"],[is_sat],[f"ID = {self.id}"],"is_sat")[0]
         logger.info("Problem is %s", "SAT" if sat else "UNSAT")
+
+    # Overwriting Countable
+    def count_after_solve_log(self, count):
+        logger.info("Problem has %d models", count)
+
 
 args.specific[Sat] = dict(
     help="Solve SAT instances",

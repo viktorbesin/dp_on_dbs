@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 from dpdb.reader import TwReader
 from dpdb.db import DB
+from dpdb.countable import Countable
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,11 @@ args.general = {
         help="How to store/use candidate results",
         choices=["cte","subquery","table"],
         default="subquery"
+    ),
+    "--count-solutions": dict(
+        action="store_true",
+        dest="count_solutions",
+        help="Count the solutions for the problem"
     )
 }
 
@@ -67,23 +73,29 @@ def var2tab_col(node, var, alias=True):
     else:
         return "{}.{}".format(var2tab_alias(node, var),var2col(var))
 
+
 class Problem(object):
     id = None
     td = None
 
     def __init__(self, name, pool, max_worker_threads=12,
             candidate_store="cte", limit_result_rows=None,
-            randomize_rows=False, **kwargs):
+            randomize_rows=False, count_solutions=False, **kwargs):
         self.name = name
         self.pool = pool
         self.candidate_store = candidate_store
         self.limit_result_rows = limit_result_rows
         self.randomize_rows = randomize_rows
+        self.count_solutions = count_solutions
         self.max_worker_threads = max_worker_threads
         self.kwargs = kwargs
         self.type = type(self).__name__
         self.db = DB.from_pool(pool)
         self.interrupted = False
+
+        if not issubclass(self.__class__, Countable):
+            logger.warning("Problem {} does not implement Countable".format(self.type))
+
 
     # overwrite the following methods (if required)
     def td_node_column_def(self, var):
@@ -158,6 +170,8 @@ class Problem(object):
                 )
 
         extra_cols = self.candidate_extra_cols(node)
+        if self.count_solutions:
+            extra_cols = extra_cols + self.count_candidate_cols(node)
         if extra_cols:
             q += "{}{}".format(", " if node.vertices else "", ",".join(extra_cols))
 
@@ -176,6 +190,9 @@ class Problem(object):
         sel_list = ",".join([var2col(v) if v in node.stored_vertices
                                         else "null::{} {}".format(self.td_node_column_def(v)[1],var2col(v)) for v in node.vertices])
         extra_cols = self.assignment_extra_cols(node)
+        if self.count_solutions:
+            extra_cols = extra_cols + self.count_assignment()
+
         if extra_cols:
             sel_list += "{}{}".format(", " if sel_list else "", ",".join(extra_cols))
 
@@ -186,12 +203,29 @@ class Problem(object):
         elif self.candidate_store == "subquery":
             q = f"SELECT {sel_list} FROM ({candidates_sel}) AS candidate"
         elif self.candidate_store == "table":
-            q = f"SELECT {sel_list} FROM td_node_{node.id}_candidate"
+            q = f"SELECT {sel_list} FROM td_node_{node.id}_candidate AS candidate"
 
         return q
 
     def assignment_view(self,node):
-        q = "{} {}".format(self.assignment_select(node),self.filter(node))
+        node_filter = self.filter(node)
+
+        q = "{} {}".format(self.assignment_select(node), node_filter)
+
+        if self.count_solutions:
+            if self.candidate_store == "cte":
+                count_extra_clauses = self.count_extra_clauses(node, "candidate")
+            elif self.candidate_store == "subquery":
+                count_extra_clauses = self.count_extra_clauses(node, f"({self.candidates_select(node)})")
+            elif self.candidate_store == "table":
+                count_extra_clauses = self.count_extra_clauses(node, f"td_node_{node.id}_candidate")
+
+
+            if count_extra_clauses:
+                if node_filter == "":
+                    q += "WHERE {}".format(count_extra_clauses)
+                else:
+                    q += " AND {}".format(count_extra_clauses)
 
         if node.stored_vertices:
             q += " GROUP BY {}".format(",".join([var2col(v) for v in node.stored_vertices]))
@@ -286,11 +320,14 @@ class Problem(object):
 
             # create all columns and insert null if values are not used in parent
             # this only works in the current version of manual inserts without procedure calls in worker
+            node_columns = [self.td_node_column_def(c) for c in n.vertices] + self.td_node_extra_columns(n)
 
-            # workaround to allow more colums per variable
-            db.create_table(f"td_node_{n.id}", [self.td_node_column_def(c) for c in n.vertices] + self.td_node_extra_columns(n))
+            if self.count_solutions:
+                node_columns = node_columns + self.count_col()
+
+            db.create_table(f"td_node_{n.id}", node_columns)
             if self.candidate_store == "table":
-                db.create_table(f"td_node_{n.id}_candidate", [self.td_node_column_def(c) for c in n.vertices] + self.td_node_extra_columns(n))
+                db.create_table(f"td_node_{n.id}_candidate", node_columns)
                 candidate_view = self.candidates_select(n)
                 candidate_view = db.replace_dynamic_tabs(candidate_view)
                 db.create_view(f"td_node_{n.id}_candidate_v", candidate_view)
@@ -302,10 +339,13 @@ class Problem(object):
             
         def insert_data():
             logger.debug("Inserting problem data")
-            self.db.ignore_next_praefix(3)
+
+            self.db.ignore_next_praefix(4)
             self.db.insert("problem_option",("id", "name", "value"),(self.id,"candidate_store",self.candidate_store))
             self.db.insert("problem_option",("id", "name", "value"),(self.id,"limit_result_rows",self.limit_result_rows))
             self.db.insert("problem_option",("id", "name", "value"),(self.id,"randomize_rows",self.randomize_rows))
+            self.db.insert("problem_option",("id", "name", "value"),(self.id,"count_solutions",self.count_solutions))
+
             for k, v in self.kwargs.items():
                 if v:
                     self.db.ignore_next_praefix()
@@ -352,6 +392,12 @@ class Problem(object):
                 workers[n.id] = e
 
         self.after_solve()
+
+        if self.count_solutions:
+            root_tab = f"td_node_{self.td.root.id}"
+            (select, where) = self.count_after_solve_select()
+            count = self.db.select(root_tab, select, where)[0]
+            self.count_after_solve_log(count)
 
         self.db.ignore_next_praefix()
         self.db.update("problem",["end_time"],["statement_timestamp()"],[f"ID = {self.id}"])

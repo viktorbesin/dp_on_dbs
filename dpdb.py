@@ -133,6 +133,7 @@ if __name__ == "__main__":
     gen_opts.add_argument("--faster", dest="faster", help="Store less information in database", action="store_true")
     gen_opts.add_argument("--parallel-setup", dest="parallel_setup", help="Perform setup in parallel", action="store_true")
 
+
     # problem options
     prob_opts = parser.add_argument_group("problem options", "Options that apply to all problem types")
     for arg, kwargs in args.general.items():

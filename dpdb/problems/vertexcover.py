@@ -6,7 +6,7 @@ from dpdb.problem import *
 
 logger = logging.getLogger(__name__)
 
-class VertexCover(Problem):
+class VertexCover(Problem, Countable):
 
     def __init__(self, name, pool, input_format, **kwargs):
         self.input_format = input_format
@@ -94,8 +94,24 @@ class VertexCover(Problem):
         root_tab = f"td_node_{self.td.root.id}"
         size_sql = self.db.replace_dynamic_tabs(f"(select coalesce(min(size),0) from {root_tab})")
         self.db.ignore_next_praefix()
-        size = self.db.update("problem_vertexcover",["size"],[size_sql],[f"ID = {self.id}"],"size")[0]
-        logger.info("Min vertex cover size: %d", size)
+        self.size = self.db.update("problem_vertexcover",["size"],[size_sql],[f"ID = {self.id}"],"size")[0]
+        logger.info("Min vertex cover size: %d", self.size)
+
+    # Overwriting Countable
+    def count_after_solve_select(self):
+        return (["sum(count)"], [f"size = {self.size}"])
+
+    def count_after_solve_log(self, count):
+        logger.info("Problem has %d interpretations with minVC %d", count, self.size)
+
+    def extra_clauses_cols(self):
+        return "size"
+
+    def extra_clauses_cols_comparison(self):
+        return "min(size)"
+
+    def extra_clauses_filter_problem(self,node):
+        return self.filter(node)
 
 def var2size(node,var):
     if node.needs_introduce(var):
