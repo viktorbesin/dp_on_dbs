@@ -105,10 +105,10 @@ class VertexCover(Problem, Countable):
         logger.info("Problem has %d interpretations with minVC %d", count, self.size)
 
     def extra_clauses_cols(self):
-        return "size"
+        return ["size"]
 
     def extra_clauses_cols_comparison(self):
-        return "min(size)"
+        return ["min(size)"]
 
     def extra_clauses_filter_problem(self,node):
         return self.filter(node)

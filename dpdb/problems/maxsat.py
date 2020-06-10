@@ -2,7 +2,6 @@
 import logging
 from collections import defaultdict
 
-from dpdb.problem import *
 from dpdb.reader import AdvancedCnfReader
 from .sat_util import *
 
@@ -93,16 +92,16 @@ class MaxSat(Problem, Countable):
 
     # Overwriting Countable
     def count_after_solve_select(self):
-        return (["count"], [f"card = {self.max_clauses}"])
+        return (["sum(count)"], [f"card = {self.max_clauses}"])
 
     def count_after_solve_log(self, count):
         logger.info("Problem has %d interpretations with %d satisified soft clauses", count, self.max_clauses)
 
     def extra_clauses_cols(self):
-        return "card"
+        return ["card"]
 
     def extra_clauses_cols_comparison(self):
-        return "max(card)"
+        return ["max(card)"]
 
     def extra_clauses_filter_problem(self,node):
         return self.filter(node)
