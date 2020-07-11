@@ -60,7 +60,7 @@ class Sat(Problem, Countable):
         logger.info("Problem is %s", "SAT" if sat else "UNSAT")
 
     # Overwriting Countable
-    def count_after_solve_log(self, count):
+    def c_after_solve_log(self, count):
         logger.info("Problem has %d models", count)
 
 

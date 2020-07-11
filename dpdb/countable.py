@@ -4,23 +4,23 @@ class Countable(object):
     # overwrite the following methods (if required)
 
     # Some problems need the comparison of extra columns in the candidates to count correctly. return them here
-    def extra_clauses_cols(self):
+    def c_extra_cols(self):
         return []
 
     # If a column needs to be compared, which value (from the candidates) should it be compared to? - respective order of extra_clauses_cols()
-    def extra_clauses_cols_comparison(self):
+    def c_extra_cols_comparison(self):
         return []
 
     # Change the where to whatever is looked for
-    def count_after_solve_select(self):
+    def c_after_solve_select(self):
         return (["coalesce(sum(count),0)"], None)
 
     # Log the number of solutions
-    def count_after_solve_log(self, count):
+    def c_after_solve_log(self, count):
         pass
 
     # Filter the second candidate select, typically the node filter is needed here
-    def extra_clauses_filter_problem(self,node):
+    def c_filter_problem(self, node):
         return ""
 
     # the following methods can be overwritten at your own risk
@@ -38,8 +38,8 @@ class Countable(object):
 
     # filter the candidates if extra cols need to be compared
     def count_extra_clauses(self, node, candidate_table):
-        clauses_cols = self.extra_clauses_cols()
-        clauses_comparison = self.extra_clauses_cols_comparison()
+        clauses_cols = self.c_extra_cols()
+        clauses_comparison = self.c_extra_cols_comparison()
 
         if clauses_cols:
             clauses = []
@@ -61,7 +61,7 @@ class Countable(object):
 
 
     def extra_clauses_filter(self,node):
-        node_filter = self.extra_clauses_filter_problem(node)
+        node_filter = self.c_filter_problem(node)
         if node_filter:
             node_filter += " AND {}".format(" AND ".join(self.extra_clauses_filter_join(node)))
             return node_filter

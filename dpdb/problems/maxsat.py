@@ -91,19 +91,19 @@ class MaxSat(Problem, Countable):
         logger.info("Max satisfied soft clauses: %d", self.max_clauses)
 
     # Overwriting Countable
-    def count_after_solve_select(self):
+    def c_after_solve_select(self):
         return (["sum(count)"], [f"card = {self.max_clauses}"])
 
-    def count_after_solve_log(self, count):
+    def c_after_solve_log(self, count):
         logger.info("Problem has %d interpretations with %d satisified soft clauses", count, self.max_clauses)
 
-    def extra_clauses_cols(self):
+    def c_extra_cols(self):
         return ["card"]
 
-    def extra_clauses_cols_comparison(self):
+    def c_extra_cols_comparison(self):
         return ["max(card)"]
 
-    def extra_clauses_filter_problem(self,node):
+    def c_filter_problem(self, node):
         return self.filter(node)
 
 

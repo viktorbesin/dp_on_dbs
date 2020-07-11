@@ -395,9 +395,9 @@ class Problem(object):
 
         if self.count_solutions:
             root_tab = f"td_node_{self.td.root.id}"
-            (select, where) = self.count_after_solve_select()
+            (select, where) = self.c_after_solve_select()
             count = self.db.select(root_tab, select, where)[0]
-            self.count_after_solve_log(count)
+            self.c_after_solve_log(count)
 
         self.db.ignore_next_praefix()
         self.db.update("problem",["end_time"],["statement_timestamp()"],[f"ID = {self.id}"])

@@ -98,19 +98,19 @@ class VertexCover(Problem, Countable):
         logger.info("Min vertex cover size: %d", self.size)
 
     # Overwriting Countable
-    def count_after_solve_select(self):
+    def c_after_solve_select(self):
         return (["sum(count)"], [f"size = {self.size}"])
 
-    def count_after_solve_log(self, count):
+    def c_after_solve_log(self, count):
         logger.info("Problem has %d interpretations with minVC %d", count, self.size)
 
-    def extra_clauses_cols(self):
+    def c_extra_cols(self):
         return ["size"]
 
-    def extra_clauses_cols_comparison(self):
+    def c_extra_cols_comparison(self):
         return ["min(size)"]
 
-    def extra_clauses_filter_problem(self,node):
+    def c_filter_problem(self, node):
         return self.filter(node)
 
 def var2size(node,var):

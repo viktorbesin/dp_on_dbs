@@ -103,22 +103,11 @@ class CnfReader(DimacsReader):
         if len(self.clauses) != self.num_clauses:
             logger.warning("Effective number of clauses mismatch preamble (%d vs %d)", len(self.clauses), self.num_clauses)
 
-class AdvancedCnfReader(DimacsReader):
+class AdvancedCnfReader(CnfReader):
     def __init__(self):
         super().__init__()
-        self.vars = []
         self.hard_clauses = []
         self.soft_clauses = []
-        self.solution = -1
-
-    def store_problem_vars(self):
-        # We assume a CNF file containing a solution is pre-solved by pmc and
-        # the solution line contains only the number of models for sharpsat
-        if self.problem_solution_type == 's':
-            logger.info("Problem has %d models (solved by pre-processing)", int(self.format))
-        else:
-            self.num_vars = int(self._problem_vars[0])
-            self.num_clauses = int(self._problem_vars[1])
 
     def body(self, lines):
         if self.format != "cnf":
